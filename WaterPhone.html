@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#121212">
+  <meta name="description" content="Schlichtes Telefonbuch als PWA">
+  
+  <!-- Apple Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Telefonbuch">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a1a1a'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23ffffff' font-family='system-ui'%3E📞%3C/text%3E%3C/svg%3E">
+  
+  <!-- Manifest -->
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Telefonbuch%22%2C%22short_name%22%3A%22Telefonbuch%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23121212%22%2C%22theme_color%22%3A%22%23121212%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D%2527http%253A%2F%2Fwww.w3.org%2F2000%2Fsvg%2527%2520viewBox%253D%25270%25200%2520100%2520100%2527%253E%253Crect%2520width%253D%2527100%2527%2520height%253D%2527100%2527%2520rx%253D%252720%2527%2520fill%253D%2527%25231a1a1a%2527%2F%253E%253Ctext%2520x%253D%252750%2527%2520y%253D%252768%2527%2520font-size%253D%252752%2527%2520text-anchor%253D%2527middle%2527%2520fill%253D%2527%2523ffffff%2527%2520font-family%253D%2527system-ui%2527%253E%25F0%259F%2593%259E%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+  
+  <title>Telefonbuch</title>
+  <style>
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --surface-2: #2a2a2a;
+      --text: #e0e0e0;
+      --text-secondary: #a0a0a0;
+      --accent: #4a9eff;
+      --danger: #ff4a4a;
+      --border: #333;
+      --radius: 12px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
+      padding: calc(12px + var(--safe-top)) 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      color: var(--text-secondary);
+      font-size: 18px;
+      pointer-events: none;
+    }
+
+    #search {
+      width: 100%;
+      padding: 14px 16px 14px 44px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #search:focus {
+      border-color: var(--accent);
+    }
+
+    #search::placeholder {
+      color: var(--text-secondary);
+    }
+
+    main {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(16px + var(--safe-bottom));
+    }
+
+    #list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .entry {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      gap: 16px;
+    }
+
+    .entry:active {
+      background: var(--surface-2);
+    }
+
+    .kuerzel {
+      flex: 0 0 60px;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .name {
+      flex: 1;
+      font-size: 16px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Highlight-Styling für Suchtreffer */
+    mark {
+      background: transparent;
+      color: var(--accent);
+      font-weight: 700;
+      padding: 0;
+    }
+
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .upload-area {
+      margin: 20px 16px;
+      padding: 30px 20px;
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      text-align: center;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .upload-area:active {
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+
+    .upload-area .icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .upload-area .hint {
+      font-size: 13px;
+      margin-top: 8px;
+      color: var(--text-secondary);
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .delete-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      margin: 16px;
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--danger);
+      font-size: 15px;
+      font-weight: 500;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .delete-item:active {
+      background: var(--surface-2);
+    }
+
+    main::-webkit-scrollbar {
+      width: 4px;
+    }
+    main::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input type="search" id="search" placeholder="Kürzel oder Name suchen..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+  </header>
+
+  <main>
+    <div id="app-content"></div>
+  </main>
+
+  <input type="file" id="file-input" accept=".json,application/json">
+
+  <script>
+    // ---------- IndexedDB Helper ----------
+    const DB_NAME = 'telefonbuch-db';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'eintraege';
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function getAllEntries() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function addEntries(entries) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        entries.forEach(entry => {
+          const { id, ...rest } = entry;
+          store.add(rest);
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function clearEntries() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    // ---------- App State ----------
+    let allEntries = [];
+    let filteredEntries = [];
+
+    const searchInput = document.getElementById('search');
+    const appContent = document.getElementById('app-content');
+    const fileInput = document.getElementById('file-input');
+
+    // ---------- Normalisierung ----------
+    // Umlaute & ß -> Basisbuchstaben für tolerante Suche
+    function normalize(str) {
+      return String(str || '')
+        .toLowerCase()
+        .replace(/ä/g, 'a')
+        .replace(/ö/g, 'o')
+        .replace(/ü/g, 'u')
+        .replace(/ß/g, 'ss');
+    }
+
+    // ---------- Such-Scoring ----------
+    // Priorität:
+    //   Kürzel exakt        = 1
+    //   Kürzel Präfix       = 2
+    //   Kürzel Teilstring   = 3
+    //   Name exakt          = 4
+    //   Name Wortanfang     = 5
+    //   Name Präfix         = 6
+    //   Name Teilstring     = 7
+    // Alles ohne Treffer wird verworfen.
+    function scoreEntry(entry, query) {
+      const q = normalize(query);
+      if (!q) return 0;
+
+      const k = normalize(entry.kuerzel);
+      const n = normalize(entry.name);
+
+      // --- Kürzel ---
+      if (k === q) return 1;
+      if (k.startsWith(q)) return 2;
+      if (k.includes(q)) return 3;
+
+      // --- Name ---
+      if (n === q) return 4;
+
+      // Wortanfang im Namen (z.B. "we" -> "Weiffen Sandra")
+      const words = n.split(/[\s\-]+/);
+      if (words.some(w => w.startsWith(q))) return 5;
+
+      if (n.startsWith(q)) return 6;
+      if (n.includes(q)) return 7;
+
+      return -1; // kein Treffer
+    }
+
+    // ---------- Highlighting ----------
+    function highlight(text, query) {
+      const safe = escapeHtml(text);
+      if (!query) return safe;
+      const q = query.trim();
+      if (!q) return safe;
+
+      // Case-insensitive Regex, Sonderzeichen escapen
+      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp('(' + escaped + ')', 'gi');
+      return safe.replace(re, '<mark>$1</mark>');
+    }
+
+    // ---------- Rendering ----------
+    function render() {
+      if (allEntries.length === 0) {
+        appContent.innerHTML = `
+          <div class="upload-area" id="upload-trigger">
+            <span class="icon">📁</span>
+            <div>JSON-Datei laden</div>
+            <div class="hint">Tippe hier, um deine Telefonbuch-JSON auszuwählen</div>
+          </div>
+        `;
+        document.getElementById('upload-trigger').addEventListener('click', () => fileInput.click());
+        return;
+      }
+
+      const query = searchInput.value.trim();
+
+      if (!query) {
+        // Ohne Suche: Originalreihenfolge beibehalten
+        filteredEntries = [...allEntries];
+      } else {
+        // Mit Suche: nach Score sortieren (kleinster Score = beste Priorität)
+        filteredEntries = allEntries
+          .map(entry => ({ entry, score: scoreEntry(entry, query) }))
+          .filter(item => item.score >= 0)
+          .sort((a, b) => {
+            if (a.score !== b.score) return a.score - b.score;
+            // Sekundär: alphabetisch nach Kürzel
+            return normalize(a.entry.kuerzel).localeCompare(normalize(b.entry.kuerzel));
+          })
+          .map(item => item.entry);
+      }
+
+      let html = '<ul id="list">';
+      if (filteredEntries.length === 0) {
+        html += `<li class="empty-state">Keine Einträge gefunden.</li>`;
+      } else {
+        filteredEntries.forEach(entry => {
+          const k = highlight(entry.kuerzel || '', query);
+          const n = highlight(entry.name || '', query);
+          html += `<li class="entry"><span class="kuerzel">${k}</span><span class="name">${n}</span></li>`;
+        });
+      }
+      html += '</ul>';
+      html += `<div class="delete-item" id="delete-btn">🗑️ Datenbank löschen</div>`;
+      appContent.innerHTML = html;
+
+      document.getElementById('delete-btn').addEventListener('click', async () => {
+        if (confirm('Möchtest du wirklich alle Daten löschen? Danach kannst du eine neue JSON laden.')) {
+          await clearEntries();
+          allEntries = [];
+          searchInput.value = '';
+          render();
+        }
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // ---------- Search ----------
+    searchInput.addEventListener('input', render);
+
+    // ---------- File Upload ----------
+    fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        if (!Array.isArray(json)) throw new Error('JSON muss ein Array sein');
+        await addEntries(json);
+        allEntries = await getAllEntries();
+        render();
+      } catch (err) {
+        alert('Fehler beim Laden der JSON: ' + err.message);
+      } finally {
+        fileInput.value = '';
+      }
+    });
+
+    // ---------- Init ----------
+    async function init() {
+      try {
+        allEntries = await getAllEntries();
+      } catch (e) {
+        allEntries = [];
+      }
+      render();
+    }
+
+    init();
+
+    // ---------- Service Worker (inline) ----------
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE_NAME = 'telefonbuch-v1';
+        const ASSETS = [
+          './',
+          './index.html'
+        ];
+
+        self.addEventListener('install', (event) => {
+          event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+          );
+          self.skipWaiting();
+        });
+
+        self.addEventListener('activate', (event) => {
+          event.waitUntil(
+            caches.keys().then((keys) =>
+              Promise.all(
+                keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+              )
+            )
+          );
+          self.clients.claim();
+        });
+
+        self.addEventListener('fetch', (event) => {
+          event.respondWith(
+            caches.match(event.request).then((cached) => {
+              return cached || fetch(event.request).then((response) => {
+                return caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(event.request, response.clone());
+                  return response;
+                });
+              });
+            }).catch(() => caches.match('./index.html'))
+          );
+        });
+      `;
+
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      const swUrl = URL.createObjectURL(blob);
+
+      navigator.serviceWorker.register(swUrl, { scope: './' })
+        .then((reg) => console.log('SW registriert:', reg.scope))
+        .catch((err) => console.log('SW Fehler:', err));
+    }
+  </script>
+
+</body>
+</html>
